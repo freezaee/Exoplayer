@@ -15,6 +15,8 @@
  */
 package com.google.android.exoplayer.demo;
 
+import com.google.android.exoplayer.demo.Samples.Sample;
+
 import android.app.Activity;
 import android.os.Bundle;
 
@@ -31,5 +33,23 @@ public class SampleChooserActivity extends Activity {
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.sample_chooser_activity);
+    final List<SampleGroup> sampleGroups = new ArrayList<>();
+
+  }
+  private static final class SampleGroup {
+
+    public final String title;
+    public final List<Sample> samples;
+
+    public SampleGroup(String title) {
+      this.title = title;
+      this.samples = new ArrayList<>();
     }
+
+    public void addAll(Sample[] samples) {
+      Collections.addAll(this.samples, samples);
+    }
+
+  }
+
 }

@@ -15,22 +15,31 @@
 -->
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.google.android.exoplayer.demo">
+    package="com.google.android.exoplayer.demo"
+    android:versionCode="1509"
+    android:versionName="1.5.9"
+    android:theme="@style/RootTheme">
+
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+
+  <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="23"/>
 
   <application
       android:label="@string/application_name"
-
-        android:allowBackup="true"
       android:icon="@drawable/ic_launcher"
-        android:supportsRtl="true"
-        android:theme="@style/AppTheme">
-        <activity android:name=".SampleChooserActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
+      android:largeHeap="true"
+      android:allowBackup="false">
 
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+    <activity android:name="com.google.android.exoplayer.demo.SampleChooserActivity"
+        android:configChanges="keyboardHidden"
+        android:label="@string/application_name">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+    </activity>
+
     </application>
 
 </manifest>
