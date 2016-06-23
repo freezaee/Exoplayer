@@ -19,6 +19,8 @@ import android.content.Context;
 import android.util.AttributeSet;
 import android.view.View;
 
+import java.util.List;
+
 /**
  * A view for rendering rich-formatted captions.
  */
@@ -36,7 +38,15 @@ public final class SubtitleLayout extends View {
 
   public SubtitleLayout(Context context, AttributeSet attrs) {
     super(context, attrs);
-    }
+  }
+
+  /**
+   * Sets the cues to be displayed by the view.
+   *
+   * @param cues The cues to display.
+   */
+  public void setCues(List<Cue> cues) {
+  }
 
   /**
    * Sets the text size to be a fraction of the view's remaining height after its top and bottom

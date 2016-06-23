@@ -13,29 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.android.exoplayer;
-
-import android.content.Context;
-import android.util.AttributeSet;
-import android.widget.FrameLayout;
+package com.google.android.exoplayer.metadata.id3;
 
 /**
- * A {@link FrameLayout} that resizes itself to match a specified aspect ratio.
+ * Base class for ID3 frames.
  */
-public final class AspectRatioFrameLayout extends FrameLayout {
-  public AspectRatioFrameLayout(Context context) {
-    super(context);
-  }
-
-  public AspectRatioFrameLayout(Context context, AttributeSet attrs) {
-    super(context, attrs);
-  }
+public abstract class Id3Frame {
 
   /**
-   * Set the aspect ratio that this view should satisfy.
-   *
-   * @param widthHeightRatio The width to height ratio.
+   * The frame ID.
    */
-  public void setAspectRatio(float widthHeightRatio) {
-    }
+  public final String id;
+
+  public Id3Frame(String id) {
+    this.id = id;
+  }
+
 }

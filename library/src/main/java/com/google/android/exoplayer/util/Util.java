@@ -69,6 +69,18 @@ public final class Util {
   }
 
   /**
+   * Tests two objects for {@link Object#equals(Object)} equality, handling the case where one or
+   * both may be null.
+   *
+   * @param o1 The first object.
+   * @param o2 The second object.
+   * @return {@code o1 == null ? o2 == null : o1.equals(o2)}.
+   */
+  public static boolean areEqual(Object o1, Object o2) {
+    return o1 == null ? o2 == null : o1.equals(o2);
+  }
+
+  /**
    * Returns a user agent string based on the given application name and the library version.
    *
    * @param context A valid context of the calling application.

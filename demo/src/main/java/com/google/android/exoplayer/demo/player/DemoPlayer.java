@@ -15,9 +15,20 @@
  */
 package com.google.android.exoplayer.demo.player;
 
+import com.google.android.exoplayer.MediaCodecTrackRenderer.DecoderInitializationException;
+import com.google.android.exoplayer.TimeRange;
+import com.google.android.exoplayer.audio.AudioTrack;
+import com.google.android.exoplayer.metadata.id3.Id3Frame;
+import com.google.android.exoplayer.text.Cue;
 import com.google.android.exoplayer.util.DebugTextViewHelper;
 import com.google.android.exoplayer.util.PlayerControl;
+
+import android.media.MediaCodec.CryptoException;
 import android.view.Surface;
+
+import java.io.IOException;
+import java.text.Format;
+import java.util.List;
 
 /**
  * Created by Elvis.He on 2016/6/23.
@@ -49,6 +60,10 @@ public class DemoPlayer implements DebugTextViewHelper.Provider {
    * A listener for core events.
    */
   public interface Listener {
+    void onStateChanged(boolean playWhenReady, int playbackState);
+    void onError(Exception e);
+    void onVideoSizeChanged(int width, int height, int unappliedRotationDegrees,
+        float pixelWidthHeightRatio);
   }
 
   /**
@@ -60,24 +75,45 @@ public class DemoPlayer implements DebugTextViewHelper.Provider {
    * will be invoked.
    */
   public interface InternalErrorListener {
+    void onRendererInitializationError(Exception e);
+    void onAudioTrackInitializationError(AudioTrack.InitializationException e);
+    void onAudioTrackWriteError(AudioTrack.WriteException e);
+    void onAudioTrackUnderrun(int bufferSize, long bufferSizeMs, long elapsedSinceLastFeedMs);
+    void onDecoderInitializationError(DecoderInitializationException e);
+    void onCryptoError(CryptoException e);
+    void onLoadError(int sourceId, IOException e);
+    void onDrmSessionManagerError(Exception e);
   }
 
   /**
    * A listener for debugging information.
    */
   public interface InfoListener {
+    void onVideoFormatEnabled(Format format, int trigger, long mediaTimeMs);
+    void onAudioFormatEnabled(Format format, int trigger, long mediaTimeMs);
+    void onDroppedFrames(int count, long elapsed);
+    void onBandwidthSample(int elapsedMs, long bytes, long bitrateEstimate);
+    void onLoadStarted(int sourceId, long length, int type, int trigger, Format format,
+        long mediaStartTimeMs, long mediaEndTimeMs);
+    void onLoadCompleted(int sourceId, long bytesLoaded, int type, int trigger, Format format,
+        long mediaStartTimeMs, long mediaEndTimeMs, long elapsedRealtimeMs, long loadDurationMs);
+    void onDecoderInitialized(String decoderName, long elapsedRealtimeMs,
+        long initializationDurationMs);
+    void onAvailableRangeChanged(int sourceId, TimeRange availableRange);
   }
 
   /**
    * A listener for receiving notifications of timed text.
    */
   public interface CaptionListener {
+    void onCues(List<Cue> cues);
   }
 
   /**
    * A listener for receiving ID3 metadata parsed from the media stream.
    */
   public interface Id3MetadataListener {
+    void onId3Metadata(List<Id3Frame> id3Frames);
   }
   public static final int TYPE_VIDEO = 0;
   public static final int TYPE_AUDIO = 1;
@@ -112,6 +148,9 @@ public class DemoPlayer implements DebugTextViewHelper.Provider {
   public int getTrackCount(int type) {
     return 2;
   }
+  public boolean getBackgrounded() {
+    return false;
+  }
   public void setBackgrounded(boolean backgrounded) {
   }
 
@@ -125,6 +164,10 @@ public class DemoPlayer implements DebugTextViewHelper.Provider {
   public void release() {
   }
   public long getCurrentPosition() {
-    return 0;
+  return 0;
   }
+  public boolean getPlayWhenReady() {
+    return true;
+  }
+
 }
