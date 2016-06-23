@@ -18,9 +18,15 @@ package com.google.android.exoplayer.demo;
 import com.google.android.exoplayer.AspectRatioFrameLayout;
 import com.google.android.exoplayer.audio.AudioCapabilities;
 import com.google.android.exoplayer.audio.AudioCapabilitiesReceiver;
+import com.google.android.exoplayer.demo.player.DashRendererBuilder;
 import com.google.android.exoplayer.demo.player.DemoPlayer;
+import com.google.android.exoplayer.demo.player.DemoPlayer.RendererBuilder;
+import com.google.android.exoplayer.demo.player.ExtractorRendererBuilder;
+import com.google.android.exoplayer.demo.player.HlsRendererBuilder;
+import com.google.android.exoplayer.demo.player.SmoothStreamingRendererBuilder;
 import com.google.android.exoplayer.text.CaptionStyleCompat;
 import com.google.android.exoplayer.text.SubtitleLayout;
+import com.google.android.exoplayer.util.DebugTextViewHelper;
 import com.google.android.exoplayer.util.Util;
 
 import android.Manifest.permission;
@@ -52,7 +58,11 @@ import java.net.CookiePolicy;
 
 
 
-public class PlayerActivity extends Activity  implements SurfaceHolder.Callback , OnClickListener,
+/**
+ * An activity that plays media using {@link DemoPlayer}.
+ */
+public class PlayerActivity extends Activity implements SurfaceHolder.Callback, OnClickListener,
+    DemoPlayer.Listener, DemoPlayer.CaptionListener, DemoPlayer.Id3MetadataListener,
     AudioCapabilitiesReceiver.Listener {
 
   // For use within demo app code.
@@ -70,6 +80,7 @@ public class PlayerActivity extends Activity  implements SurfaceHolder.Callback 
     defaultCookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ORIGINAL_SERVER);
   }
 
+  private EventLogger eventLogger;
   private MediaController mediaController;
   private View debugRootView;
   private View shutterView;
@@ -84,7 +95,12 @@ public class PlayerActivity extends Activity  implements SurfaceHolder.Callback 
   private Button retryButton;
 
   private DemoPlayer player;
+  private DebugTextViewHelper debugViewHelper;
+  private boolean playerNeedsPrepare;
+
   private long playerPosition;
+  private boolean enableBackgroundAudio;
+
   private Uri contentUri;
   private int contentType;
   private String contentId;
@@ -207,6 +223,12 @@ public class PlayerActivity extends Activity  implements SurfaceHolder.Callback 
   }
 
   private void onHidden() {
+    if (!enableBackgroundAudio) {
+      releasePlayer();
+    } else {
+      player.setBackgrounded(true);
+    }
+    shutterView.setVisibility(View.VISIBLE);
   }
 
   @Override
@@ -216,7 +238,13 @@ public class PlayerActivity extends Activity  implements SurfaceHolder.Callback 
     releasePlayer();
   }
 
+  // OnClickListener methods
+
+  @Override
   public void onClick(View view) {
+    if (view == retryButton) {
+      preparePlayer(true);
+    }
   }
 
   // AudioCapabilitiesReceiver.Listener methods
@@ -232,31 +260,96 @@ public class PlayerActivity extends Activity  implements SurfaceHolder.Callback 
    *
    * @return true if a permission request is made. False if it is not necessary.
    */
+  @TargetApi(23)
   private boolean maybeRequestPermission() {
     if (requiresPermission(contentUri)) {
+      requestPermissions(new String[] {permission.READ_EXTERNAL_STORAGE}, 0);
       return true;
     } else {
       return false;
     }
   }
+
+  @TargetApi(23)
   private boolean requiresPermission(Uri uri) {
     return Util.SDK_INT >= 23
         && Util.isLocalFileUri(uri)
         && checkSelfPermission(permission.READ_EXTERNAL_STORAGE)
             != PackageManager.PERMISSION_GRANTED;
   }
+
+  // Internal methods
+
+  private RendererBuilder getRendererBuilder() {
+    String userAgent = Util.getUserAgent(this, "ExoPlayerDemo");
+    switch (contentType) {
+      case Util.TYPE_SS:
+        return new SmoothStreamingRendererBuilder(this, userAgent, contentUri.toString(),
+            new SmoothStreamingTestMediaDrmCallback());
+      case Util.TYPE_DASH:
+        return new DashRendererBuilder(this, userAgent, contentUri.toString(),
+            new WidevineTestMediaDrmCallback(contentId, provider));
+      case Util.TYPE_HLS:
+        return new HlsRendererBuilder(this, userAgent, contentUri.toString());
+      case Util.TYPE_OTHER:
+        return new ExtractorRendererBuilder(this, userAgent, contentUri);
+      default:
+        throw new IllegalStateException("Unsupported type: " + contentType);
+    }
+  }
+
   private void preparePlayer(boolean playWhenReady) {
     if (player == null) {
-
+      player = new DemoPlayer(getRendererBuilder());
+      player.addListener(this);
+      player.setCaptionListener(this);
+      player.setMetadataListener(this);
+      player.seekTo(playerPosition);
+      playerNeedsPrepare = true;
+      mediaController.setMediaPlayer(player.getPlayerControl());
+      mediaController.setEnabled(true);
+      eventLogger = new EventLogger();
+      eventLogger.startSession();
+      player.addListener(eventLogger);
+      player.setInfoListener(eventLogger);
+      player.setInternalErrorListener(eventLogger);
+      debugViewHelper = new DebugTextViewHelper(player, debugTextView);
+      debugViewHelper.start();
     }
+    if (playerNeedsPrepare) {
+      player.prepare();
+      playerNeedsPrepare = false;
+      updateButtonVisibilities();
+    }
+    player.setSurface(surfaceView.getHolder().getSurface());
+    player.setPlayWhenReady(playWhenReady);
   }
 
   private void releasePlayer() {
     if (player != null) {
+      debugViewHelper.stop();
+      debugViewHelper = null;
+      playerPosition = player.getCurrentPosition();
       player.release();
       player = null;
+      eventLogger.endSession();
+      eventLogger = null;
     }
   }
+
+  // User controls
+
+  private void updateButtonVisibilities() {
+    retryButton.setVisibility(playerNeedsPrepare ? View.VISIBLE : View.GONE);
+    videoButton.setVisibility(haveTracks(DemoPlayer.TYPE_VIDEO) ? View.VISIBLE : View.GONE);
+    audioButton.setVisibility(haveTracks(DemoPlayer.TYPE_AUDIO) ? View.VISIBLE : View.GONE);
+    textButton.setVisibility(haveTracks(DemoPlayer.TYPE_TEXT) ? View.VISIBLE : View.GONE);
+  }
+
+  private boolean haveTracks(int type) {
+    return player != null && player.getTrackCount(type) > 0;
+  }
+
   private void toggleControlsVisibility()  {
   }
 
