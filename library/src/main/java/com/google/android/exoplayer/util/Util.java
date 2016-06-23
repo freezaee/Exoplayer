@@ -16,10 +16,23 @@
 package com.google.android.exoplayer.util;
 
 
+import android.net.Uri;
+import android.os.Build;
+import android.text.TextUtils;
+
 /**
  * Miscellaneous utility functions.
  */
 public final class Util {
+
+  /**
+   * Like {@link android.os.Build.VERSION#SDK_INT}, but in a place where it can be conveniently
+   * overridden for local testing.
+   */
+  public static final int SDK_INT =
+      (Build.VERSION.SDK_INT == 23 && Build.VERSION.CODENAME.charAt(0) == 'N') ? 24
+      : Build.VERSION.SDK_INT;
+
   /**
    * Value returned by {@link #inferContentType(String)} for DASH manifests.
    */
@@ -41,4 +54,34 @@ public final class Util {
    */
   public static final int TYPE_OTHER = 3;
 
+  /**
+   * Returns true if the URI is a path to a local file or a reference to a local file.
+   *
+   * @param uri The uri to test.
+   */
+  public static boolean isLocalFileUri(Uri uri) {
+    String scheme = uri.getScheme();
+    return TextUtils.isEmpty(scheme) || scheme.equals("file");
+  }
+
+
+  /**
+   * Makes a best guess to infer the type from a file name.
+   *
+   * @param fileName Name of the file. It can include the path of the file.
+   * @return One of {@link #TYPE_DASH}, {@link #TYPE_SS}, {@link #TYPE_HLS} or {@link #TYPE_OTHER}.
+   */
+  public static int inferContentType(String fileName) {
+    if (fileName == null) {
+      return TYPE_OTHER;
+    } else if (fileName.endsWith(".mpd")) {
+      return TYPE_DASH;
+    } else if (fileName.endsWith(".ism")) {
+      return TYPE_SS;
+    } else if (fileName.endsWith(".m3u8")) {
+      return TYPE_HLS;
+    } else {
+      return TYPE_OTHER;
+    }
+  }
 }
