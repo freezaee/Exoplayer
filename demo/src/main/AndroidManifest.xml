@@ -40,6 +40,13 @@
       </intent-filter>
     </activity>
 
-    </application>
+    <activity android:name="com.google.android.exoplayer.demo.PlayerActivity"
+        android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+        android:launchMode="singleTop"
+        android:label="@string/application_name"
+        android:theme="@style/PlayerTheme">
+    </activity>
+
+  </application>
 
 </manifest>
