@@ -18,8 +18,10 @@ package com.google.android.exoplayer.demo.player;
 import com.google.android.exoplayer.ExoPlaybackException;
 import com.google.android.exoplayer.ExoPlayer;
 import com.google.android.exoplayer.MediaCodecTrackRenderer.DecoderInitializationException;
+import com.google.android.exoplayer.MediaCodecVideoTrackRenderer;
 import com.google.android.exoplayer.MediaFormat;
 import com.google.android.exoplayer.TimeRange;
+import com.google.android.exoplayer.TrackRenderer;
 import com.google.android.exoplayer.audio.AudioTrack;
 import com.google.android.exoplayer.metadata.id3.Id3Frame;
 import com.google.android.exoplayer.text.Cue;
@@ -32,29 +34,19 @@ import android.view.Surface;
 
 import java.io.IOException;
 import java.text.Format;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Created by Elvis.He on 2016/6/23.
+ * A wrapper around {@link ExoPlayer} that provides a higher level interface. It can be prepared
+ * with one of a number of {@link RendererBuilder} classes to suit different use cases (e.g. DASH,
+ * SmoothStreaming and so on).
  */
 
 public class DemoPlayer implements ExoPlayer.Listener,
-DebugTextViewHelper.Provider {
-  @Override
-  public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+	DebugTextViewHelper.Provider {
 
-  }
-
-  @Override
-  public void onPlayWhenReadyCommitted() {
-
-  }
-
-  @Override
-  public void onPlayerError(ExoPlaybackException error) {
-
-  }
 
   /**
    * Builds renderers for the player.
@@ -164,7 +156,13 @@ DebugTextViewHelper.Provider {
 
   private int rendererBuildingState;
   private int lastReportedPlaybackState;
+  private boolean lastReportedPlayWhenReady;
+
   private Surface surface;
+  private TrackRenderer videoRenderer;
+  private Format videoFormat;
+  private int videoTrackToRestore;
+  private boolean backgrounded;
 
   private CaptionListener captionListener;
   private Id3MetadataListener id3MetadataListener;
@@ -214,7 +212,7 @@ DebugTextViewHelper.Provider {
 
   public void setSurface(Surface surface) {
     this.surface = surface;
-//    pushSurface(false);
+    pushSurface(false);
   }
 
   public Surface getSurface() {
@@ -222,43 +220,145 @@ DebugTextViewHelper.Provider {
   }
 
   public void blockingClearSurface() {
+    surface = null;
+    pushSurface(true);
   }
 
   public int getTrackCount(int type) {
-    return 2;
+    return player.getTrackCount(type);
   }
 
   public MediaFormat getTrackFormat(int type, int index) {
-    return null;
+    return player.getTrackFormat(type, index);
   }
 
   public int getSelectedTrack(int type) {
-    return 1;
+    return player.getSelectedTrack(type);
   }
 
   public void setSelectedTrack(int type, int index) {
+    player.setSelectedTrack(type, index);
+    if (type == TYPE_TEXT && index < 0 && captionListener != null) {
+      captionListener.onCues(Collections.<Cue>emptyList());
+    }
   }
 
   public boolean getBackgrounded() {
-    return false;
+    return backgrounded;
   }
+
   public void setBackgrounded(boolean backgrounded) {
+    if (this.backgrounded == backgrounded) {
+      return;
+    }
+    this.backgrounded = backgrounded;
+    if (backgrounded) {
+      videoTrackToRestore = getSelectedTrack(TYPE_VIDEO);
+      setSelectedTrack(TYPE_VIDEO, TRACK_DISABLED);
+      blockingClearSurface();
+    } else {
+      setSelectedTrack(TYPE_VIDEO, videoTrackToRestore);
+    }
   }
 
   public void prepare() {
+    if (rendererBuildingState == RENDERER_BUILDING_STATE_BUILT) {
+      player.stop();
+    }
+    rendererBuilder.cancel();
+    videoFormat = null;
+    videoRenderer = null;
+    rendererBuildingState = RENDERER_BUILDING_STATE_BUILDING;
+    maybeReportPlayerState();
+    rendererBuilder.buildRenderers(this);
   }
   public void setPlayWhenReady(boolean playWhenReady) {
+    player.setPlayWhenReady(playWhenReady);
   }
 
   public void seekTo(long positionMs) {
+    player.seekTo(positionMs);
   }
+
   public void release() {
+    rendererBuilder.cancel();
+    rendererBuildingState = RENDERER_BUILDING_STATE_IDLE;
+    surface = null;
+    player.release();
   }
+
+  public int getPlaybackState() {
+    if (rendererBuildingState == RENDERER_BUILDING_STATE_BUILDING) {
+      return STATE_PREPARING;
+    }
+    int playerState = player.getPlaybackState();
+    if (rendererBuildingState == RENDERER_BUILDING_STATE_BUILT && playerState == STATE_IDLE) {
+      // This is an edge case where the renderers are built, but are still being passed to the
+      // player's playback thread.
+      return STATE_PREPARING;
+    }
+    return playerState;
+  }
+
   public long getCurrentPosition() {
-  return 0;
+    return player.getCurrentPosition();
   }
+
+  public long getDuration() {
+    return player.getDuration();
+  }
+
+  public int getBufferedPercentage() {
+    return player.getBufferedPercentage();
+  }
+
   public boolean getPlayWhenReady() {
-    return true;
+    return player.getPlayWhenReady();
+  }
+
+
+  @Override
+  public void onPlayerStateChanged(boolean playWhenReady, int state) {
+    maybeReportPlayerState();
+  }
+
+  @Override
+  public void onPlayerError(ExoPlaybackException exception) {
+    rendererBuildingState = RENDERER_BUILDING_STATE_IDLE;
+    for (Listener listener : listeners) {
+      listener.onError(exception);
+    }
+  }
+
+  public void onPlayWhenReadyCommitted() {
+    // Do nothing.
+  }
+
+
+  private void maybeReportPlayerState() {
+    boolean playWhenReady = player.getPlayWhenReady();
+    int playbackState = getPlaybackState();
+    if (lastReportedPlayWhenReady != playWhenReady || lastReportedPlaybackState != playbackState) {
+      for (Listener listener : listeners) {
+        listener.onStateChanged(playWhenReady, playbackState);
+      }
+      lastReportedPlayWhenReady = playWhenReady;
+      lastReportedPlaybackState = playbackState;
+    }
+  }
+
+  private void pushSurface(boolean blockForSurfacePush) {
+    if (videoRenderer == null) {
+      return;
+    }
+
+    if (blockForSurfacePush) {
+      player.blockingSendMessage(
+          videoRenderer, MediaCodecVideoTrackRenderer.MSG_SET_SURFACE, surface);
+    } else {
+      player.sendMessage(
+          videoRenderer, MediaCodecVideoTrackRenderer.MSG_SET_SURFACE, surface);
+    }
   }
 
 }

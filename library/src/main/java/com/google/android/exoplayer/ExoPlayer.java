@@ -164,8 +164,27 @@ public interface ExoPlayer {
      */
     void onPlayerError(ExoPlaybackException error);
   }
+
+  /**
+   * A component of an {@link ExoPlayer} that can receive messages on the playback thread.
+   * <p>
+   * Messages can be delivered to a component via {@link ExoPlayer#sendMessage} and
+   * {@link ExoPlayer#blockingSendMessage}.
+   */
+  public interface ExoPlayerComponent {
+
     /**
+     * Handles a message delivered to the component. Invoked on the playback thread.
+     *
+     * @param messageType An integer identifying the type of message.
+     * @param message The message object.
+     * @throws ExoPlaybackException If an error occurred whilst handling the message.
+     */
+    void handleMessage(int messageType, Object message) throws ExoPlaybackException;
+
   }
+
+  /**
    * The player is neither prepared or being prepared.
    */
   public static final int STATE_IDLE = 1;
@@ -205,5 +224,130 @@ public interface ExoPlayer {
    */
   public static final long UNKNOWN_TIME = -1;
   public void addListener(Listener listener);
+  public int getPlaybackState();
+  public int getTrackCount(int rendererIndex);
+
+  /**
+   * Returns the format of a track.
+   *
+   * @param rendererIndex The index of the renderer.
+   * @param trackIndex The index of the track.
+   * @return The format of the track.
+   */
+  public MediaFormat getTrackFormat(int rendererIndex, int trackIndex);
+
+  /**
+   * Selects a track for the specified renderer.
+   *
+   * @param rendererIndex The index of the renderer.
+   * @param trackIndex The index of the track. A negative value or a value greater than or equal to
+   *     the renderer's track count will disable the renderer.
+   */
   public void setSelectedTrack(int rendererIndex, int trackIndex);
+
+  /**
+   * Returns the index of the currently selected track for the specified renderer.
+   *
+   * @param rendererIndex The index of the renderer.
+   * @return The selected track. A negative value or a value greater than or equal to the renderer's
+   *     track count indicates that the renderer is disabled.
+   */
+  public int getSelectedTrack(int rendererIndex);
+
+  /**
+   * Sets whether playback should proceed when {@link #getPlaybackState()} == {@link #STATE_READY}.
+   * If the player is already in this state, then this method can be used to pause and resume
+   * playback.
+   *
+   * @param playWhenReady Whether playback should proceed when ready.
+   */
+  public void setPlayWhenReady(boolean playWhenReady);
+
+  /**
+   * Whether playback will proceed when {@link #getPlaybackState()} == {@link #STATE_READY}.
+   *
+   * @return Whether playback will proceed when ready.
+   */
+  public boolean getPlayWhenReady();
+
+  /**
+   * Seeks to a position specified in milliseconds.
+   *
+   * @param positionMs The seek position.
+   */
+  public void seekTo(long positionMs);
+
+  /**
+   * Stops playback. Use {@code setPlayWhenReady(false)} rather than this method if the intention
+   * is to pause playback.
+   * <p>
+   * Calling this method will cause the playback state to transition to
+   * {@link ExoPlayer#STATE_IDLE}. The player instance can still be used, and
+   * {@link ExoPlayer#release()} must still be called on the player if it's no longer required.
+   * <p>
+   * Calling this method does not reset the playback position. If this player instance will be used
+   * to play another video from its start, then {@code seekTo(0)} should be called after stopping
+   * the player and before preparing it for the next video.
+   */
+  public void stop();
+
+  /**
+   * Releases the player. This method must be called when the player is no longer required.
+   * <p>
+   * The player must not be used after calling this method.
+   */
+  public void release();
+
+  /**
+   * Sends a message to a specified component. The message is delivered to the component on the
+   * playback thread. If the component throws a {@link ExoPlaybackException}, then it is
+   * propagated out of the player as an error.
+   *
+   * @param target The target to which the message should be delivered.
+   * @param messageType An integer that can be used to identify the type of the message.
+   * @param message The message object.
+   */
+  public void sendMessage(ExoPlayerComponent target, int messageType, Object message);
+
+  /**
+   * Blocking variant of {@link #sendMessage(ExoPlayerComponent, int, Object)} that does not return
+   * until after the message has been delivered.
+   *
+   * @param target The target to which the message should be delivered.
+   * @param messageType An integer that can be used to identify the type of the message.
+   * @param message The message object.
+   */
+  public void blockingSendMessage(ExoPlayerComponent target, int messageType, Object message);
+
+  /**
+   * Gets the duration of the track in milliseconds.
+   *
+   * @return The duration of the track in milliseconds, or {@link ExoPlayer#UNKNOWN_TIME} if the
+   *     duration is not known.
+   */
+  public long getDuration();
+
+  /**
+   * Gets the current playback position in milliseconds.
+   *
+   * @return The current playback position in milliseconds.
+   */
+  public long getCurrentPosition();
+
+  /**
+   * Gets an estimate of the absolute position in milliseconds up to which data is buffered.
+   *
+   * @return An estimate of the absolute position in milliseconds up to which data is buffered,
+   *     or {@link ExoPlayer#UNKNOWN_TIME} if no estimate is available.
+   */
+  public long getBufferedPosition();
+
+  /**
+   * Gets an estimate of the percentage into the media up to which data is buffered.
+   *
+   * @return An estimate of the percentage into the media up to which data is buffered. 0 if the
+   *     duration of the media is not known or if no estimate is available.
+   */
+  public int getBufferedPercentage();
+
 }
