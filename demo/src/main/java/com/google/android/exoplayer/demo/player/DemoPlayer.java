@@ -15,7 +15,10 @@
  */
 package com.google.android.exoplayer.demo.player;
 
+import com.google.android.exoplayer.ExoPlaybackException;
+import com.google.android.exoplayer.ExoPlayer;
 import com.google.android.exoplayer.MediaCodecTrackRenderer.DecoderInitializationException;
+import com.google.android.exoplayer.MediaFormat;
 import com.google.android.exoplayer.TimeRange;
 import com.google.android.exoplayer.audio.AudioTrack;
 import com.google.android.exoplayer.metadata.id3.Id3Frame;
@@ -24,17 +27,35 @@ import com.google.android.exoplayer.util.DebugTextViewHelper;
 import com.google.android.exoplayer.util.PlayerControl;
 
 import android.media.MediaCodec.CryptoException;
+import android.os.Handler;
 import android.view.Surface;
 
 import java.io.IOException;
 import java.text.Format;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Created by Elvis.He on 2016/6/23.
  */
 
-public class DemoPlayer implements DebugTextViewHelper.Provider {
+public class DemoPlayer implements ExoPlayer.Listener,
+DebugTextViewHelper.Provider {
+  @Override
+  public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+
+  }
+
+  @Override
+  public void onPlayWhenReadyCommitted() {
+
+  }
+
+  @Override
+  public void onPlayerError(ExoPlaybackException error) {
+
+  }
+
   /**
    * Builds renderers for the player.
    */
@@ -115,12 +136,52 @@ public class DemoPlayer implements DebugTextViewHelper.Provider {
   public interface Id3MetadataListener {
     void onId3Metadata(List<Id3Frame> id3Frames);
   }
+
+  // Constants pulled into this class for convenience.
+  public static final int STATE_IDLE = ExoPlayer.STATE_IDLE;
+  public static final int STATE_PREPARING = ExoPlayer.STATE_PREPARING;
+  public static final int STATE_BUFFERING = ExoPlayer.STATE_BUFFERING;
+  public static final int STATE_READY = ExoPlayer.STATE_READY;
+  public static final int STATE_ENDED = ExoPlayer.STATE_ENDED;
+  public static final int TRACK_DISABLED = ExoPlayer.TRACK_DISABLED;
+  public static final int TRACK_DEFAULT = ExoPlayer.TRACK_DEFAULT;
+
+  public static final int RENDERER_COUNT = 4;
   public static final int TYPE_VIDEO = 0;
   public static final int TYPE_AUDIO = 1;
   public static final int TYPE_TEXT = 2;
+  public static final int TYPE_METADATA = 3;
+
+  private static final int RENDERER_BUILDING_STATE_IDLE = 1;
+  private static final int RENDERER_BUILDING_STATE_BUILDING = 2;
+  private static final int RENDERER_BUILDING_STATE_BUILT = 3;
+
+  private final RendererBuilder rendererBuilder;
+  private final ExoPlayer player;
   private final PlayerControl playerControl;
+  private final Handler mainHandler;
+  private final CopyOnWriteArrayList<Listener> listeners;
+
+  private int rendererBuildingState;
+  private int lastReportedPlaybackState;
+  private Surface surface;
+
+  private CaptionListener captionListener;
+  private Id3MetadataListener id3MetadataListener;
+  private InternalErrorListener internalErrorListener;
+  private InfoListener infoListener;
+
   public DemoPlayer(RendererBuilder rendererBuilder) {
-    playerControl = new PlayerControl();
+    this.rendererBuilder = rendererBuilder;
+    player = ExoPlayer.Factory.newInstance(RENDERER_COUNT, 1000, 5000);
+    player.addListener(this);
+    playerControl = new PlayerControl(player);
+    mainHandler = new Handler();
+    listeners = new CopyOnWriteArrayList<>();
+    lastReportedPlaybackState = STATE_IDLE;
+    rendererBuildingState = RENDERER_BUILDING_STATE_IDLE;
+    // Disable text initially.
+    player.setSelectedTrack(TYPE_TEXT, TRACK_DISABLED);
   }
 
   public PlayerControl getPlayerControl() {
@@ -128,26 +189,56 @@ public class DemoPlayer implements DebugTextViewHelper.Provider {
   }
 
   public void addListener(Listener listener) {
+    listeners.add(listener);
   }
+
+  public void removeListener(Listener listener) {
+    listeners.remove(listener);
+  }
+
   public void setInternalErrorListener(InternalErrorListener listener) {
+    internalErrorListener = listener;
   }
 
   public void setInfoListener(InfoListener listener) {
+    infoListener = listener;
   }
 
   public void setCaptionListener(CaptionListener listener) {
+    captionListener = listener;
   }
 
   public void setMetadataListener(Id3MetadataListener listener) {
+    id3MetadataListener = listener;
   }
-    public void setSurface(Surface surface) {
-    }
+
+  public void setSurface(Surface surface) {
+    this.surface = surface;
+//    pushSurface(false);
+  }
+
+  public Surface getSurface() {
+    return surface;
+  }
+
   public void blockingClearSurface() {
   }
 
   public int getTrackCount(int type) {
     return 2;
   }
+
+  public MediaFormat getTrackFormat(int type, int index) {
+    return null;
+  }
+
+  public int getSelectedTrack(int type) {
+    return 1;
+  }
+
+  public void setSelectedTrack(int type, int index) {
+  }
+
   public boolean getBackgrounded() {
     return false;
   }

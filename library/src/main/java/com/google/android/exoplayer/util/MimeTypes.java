@@ -73,4 +73,119 @@ public final class MimeTypes {
   public static final String APPLICATION_PGS = BASE_TYPE_APPLICATION + "/pgs";
 
   private MimeTypes() {}
+
+  /**
+   * Whether the top-level type of {@code mimeType} is audio.
+   *
+   * @param mimeType The mimeType to test.
+   * @return Whether the top level type is audio.
+   */
+  public static boolean isAudio(String mimeType) {
+    return getTopLevelType(mimeType).equals(BASE_TYPE_AUDIO);
+  }
+
+  /**
+   * Whether the top-level type of {@code mimeType} is video.
+   *
+   * @param mimeType The mimeType to test.
+   * @return Whether the top level type is video.
+   */
+  public static boolean isVideo(String mimeType) {
+    return getTopLevelType(mimeType).equals(BASE_TYPE_VIDEO);
+  }
+
+  /**
+   * Whether the top-level type of {@code mimeType} is text.
+   *
+   * @param mimeType The mimeType to test.
+   * @return Whether the top level type is text.
+   */
+  public static boolean isText(String mimeType) {
+    return getTopLevelType(mimeType).equals(BASE_TYPE_TEXT);
+  }
+
+  /**
+   * Whether the top-level type of {@code mimeType} is application.
+   *
+   * @param mimeType The mimeType to test.
+   * @return Whether the top level type is application.
+   */
+  public static boolean isApplication(String mimeType) {
+    return getTopLevelType(mimeType).equals(BASE_TYPE_APPLICATION);
+  }
+
+  /**
+   * Returns the top-level type of {@code mimeType}.
+   *
+   * @param mimeType The mimeType whose top-level type is required.
+   * @return The top-level type.
+   */
+  private static String getTopLevelType(String mimeType) {
+    int indexOfSlash = mimeType.indexOf('/');
+    if (indexOfSlash == -1) {
+      throw new IllegalArgumentException("Invalid mime type: " + mimeType);
+    }
+    return mimeType.substring(0, indexOfSlash);
+  }
+
+  /**
+   * Returns the video mimeType type of {@code codecs}.
+   *
+   * @param codecs The codecs for which the video mimeType is required.
+   * @return The video mimeType.
+   */
+  public static String getVideoMediaMimeType(String codecs) {
+    if (codecs == null) {
+      return MimeTypes.VIDEO_UNKNOWN;
+    }
+    String[] codecList = codecs.split(",");
+    for (String codec : codecList) {
+      codec = codec.trim();
+      if (codec.startsWith("avc1") || codec.startsWith("avc3")) {
+        return MimeTypes.VIDEO_H264;
+      } else if (codec.startsWith("hev1") || codec.startsWith("hvc1")) {
+        return MimeTypes.VIDEO_H265;
+      } else if (codec.startsWith("vp9")) {
+        return MimeTypes.VIDEO_VP9;
+      } else if (codec.startsWith("vp8")) {
+        return MimeTypes.VIDEO_VP8;
+      }
+    }
+    return MimeTypes.VIDEO_UNKNOWN;
+  }
+
+  /**
+   * Returns the audio mimeType type of {@code codecs}.
+   *
+   * @param codecs The codecs for which the audio mimeType is required.
+   * @return The audio mimeType.
+   */
+  public static String getAudioMediaMimeType(String codecs) {
+    if (codecs == null) {
+      return MimeTypes.AUDIO_UNKNOWN;
+    }
+    String[] codecList = codecs.split(",");
+    for (String codec : codecList) {
+      codec = codec.trim();
+      if (codec.startsWith("mp4a")) {
+        return MimeTypes.AUDIO_AAC;
+      } else if (codec.startsWith("ac-3") || codec.startsWith("dac3")) {
+        return MimeTypes.AUDIO_AC3;
+      } else if (codec.startsWith("ec-3") || codec.startsWith("dec3")) {
+        return MimeTypes.AUDIO_E_AC3;
+      } else if (codec.startsWith("dtsc")) {
+        return MimeTypes.AUDIO_DTS;
+      } else if (codec.startsWith("dtsh") || codec.startsWith("dtsl")) {
+        return MimeTypes.AUDIO_DTS_HD;
+      } else if (codec.startsWith("dtse")) {
+        return MimeTypes.AUDIO_DTS_EXPRESS;
+      } else if (codec.startsWith("opus")) {
+        return MimeTypes.AUDIO_OPUS;
+      } else if (codec.startsWith("vorbis")) {
+        return MimeTypes.AUDIO_VORBIS;
+      }
+    }
+    return MimeTypes.AUDIO_UNKNOWN;
+  }
+
 }

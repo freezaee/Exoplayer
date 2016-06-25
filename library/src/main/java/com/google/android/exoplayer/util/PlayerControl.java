@@ -15,6 +15,8 @@
  */
 package com.google.android.exoplayer.util;
 
+import com.google.android.exoplayer.ExoPlayer;
+
 import android.widget.MediaController.MediaPlayerControl;
 
 /**
@@ -24,6 +26,13 @@ import android.widget.MediaController.MediaPlayerControl;
  * implement their own player controls and therefore not require this class.
  */
 public class PlayerControl implements MediaPlayerControl {
+
+  private final ExoPlayer exoPlayer;
+
+  public PlayerControl(ExoPlayer exoPlayer) {
+    this.exoPlayer = exoPlayer;
+  }
+
     @Override
     public void start() {
 

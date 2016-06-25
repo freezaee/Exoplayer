@@ -93,6 +93,79 @@ import android.os.Looper;
 public interface ExoPlayer {
 
   /**
+   * A factory for instantiating ExoPlayer instances.
+   */
+  public static final class Factory {
+
+    /**
+     * The default minimum duration of data that must be buffered for playback to start or resume
+     * following a user action such as a seek.
+     */
+    public static final int DEFAULT_MIN_BUFFER_MS = 2500;
+
+    /**
+     * The default minimum duration of data that must be buffered for playback to resume
+     * after a player invoked rebuffer (i.e. a rebuffer that occurs due to buffer depletion, and
+     * not due to a user action such as starting playback or seeking).
+     */
+    public static final int DEFAULT_MIN_REBUFFER_MS = 5000;
+
+    private Factory() {}
+
+    /**
+     * Obtains an {@link ExoPlayer} instance.
+     * <p>
+     * Must be invoked from a thread that has an associated {@link Looper}.
+     *
+     * @param rendererCount The number of {@link TrackRenderer}s that will be passed to
+     *     {@link #prepare(TrackRenderer[])}.
+     * @param minBufferMs A minimum duration of data that must be buffered for playback to start
+     *     or resume following a user action such as a seek.
+     * @param minRebufferMs A minimum duration of data that must be buffered for playback to resume
+     *     after a player invoked rebuffer (i.e. a rebuffer that occurs due to buffer depletion, and
+     *     not due to a user action such as starting playback or seeking).
+     */
+    public static ExoPlayer newInstance(int rendererCount, int minBufferMs, int minRebufferMs) {
+      return new ExoPlayerImpl(rendererCount, minBufferMs, minRebufferMs);
+    }
+
+  }
+
+  /**
+   * Interface definition for a callback to be notified of changes in player state.
+   */
+  public interface Listener {
+    /**
+     * Invoked when the value returned from either {@link ExoPlayer#getPlayWhenReady()} or
+     * {@link ExoPlayer#getPlaybackState()} changes.
+     *
+     * @param playWhenReady Whether playback will proceed when ready.
+     * @param playbackState One of the {@code STATE} constants defined in the {@link ExoPlayer}
+     *     interface.
+     */
+    void onPlayerStateChanged(boolean playWhenReady, int playbackState);
+    /**
+     * Invoked when the current value of {@link ExoPlayer#getPlayWhenReady()} has been reflected
+     * by the internal playback thread.
+     * <p>
+     * An invocation of this method will shortly follow any call to
+     * {@link ExoPlayer#setPlayWhenReady(boolean)} that changes the state. If multiple calls are
+     * made in rapid succession, then this method will be invoked only once, after the final state
+     * has been reflected.
+     */
+    void onPlayWhenReadyCommitted();
+    /**
+     * Invoked when an error occurs. The playback state will transition to
+     * {@link ExoPlayer#STATE_IDLE} immediately after this method is invoked. The player instance
+     * can still be used, and {@link ExoPlayer#release()} must still be called on the player should
+     * it no longer be required.
+     *
+     * @param error The error.
+     */
+    void onPlayerError(ExoPlaybackException error);
+  }
+    /**
+  }
    * The player is neither prepared or being prepared.
    */
   public static final int STATE_IDLE = 1;
@@ -116,4 +189,21 @@ public interface ExoPlayer {
    */
   public static final int STATE_ENDED = 5;
 
+  /**
+   * A value that can be passed as the second argument to {@link #setSelectedTrack(int, int)} to
+   * disable the renderer.
+   */
+  public static final int TRACK_DISABLED = -1;
+  /**
+   * A value that can be passed as the second argument to {@link #setSelectedTrack(int, int)} to
+   * select the default track.
+   */
+  public static final int TRACK_DEFAULT = 0;
+
+  /**
+   * Represents an unknown time or duration.
+   */
+  public static final long UNKNOWN_TIME = -1;
+  public void addListener(Listener listener);
+  public void setSelectedTrack(int rendererIndex, int trackIndex);
 }
