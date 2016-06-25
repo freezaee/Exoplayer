@@ -30,6 +30,7 @@ import com.google.android.exoplayer.util.PlayerControl;
 
 import android.media.MediaCodec.CryptoException;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.Surface;
 
 import java.io.IOException;
@@ -316,6 +317,13 @@ public class DemoPlayer implements ExoPlayer.Listener,
     return player.getPlayWhenReady();
   }
 
+  /* package */ Looper getPlaybackLooper() {
+    return player.getPlaybackLooper();
+  }
+
+  /* package */ Handler getMainHandler() {
+    return mainHandler;
+  }
 
   @Override
   public void onPlayerStateChanged(boolean playWhenReady, int state) {
