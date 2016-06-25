@@ -22,6 +22,8 @@ import com.google.android.exoplayer.upstream.UriLoadable;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
+
 import java.io.IOException;
 
 /**
@@ -121,6 +123,9 @@ public class ManifestFetcher<T> implements Loader.Callback {
    * @param callback The callback to receive the result.
    */
   public void singleLoad(Looper callbackLooper, final ManifestCallback<T> callback) {
+    SingleFetchHelper fetchHelper = new SingleFetchHelper(
+        new UriLoadable<>(manifestUri, uriDataSource, parser), callbackLooper, callback);
+    fetchHelper.startLoading();
   }
   @Override
   public void onLoadCanceled(Loadable loadable) {
@@ -129,6 +134,43 @@ public class ManifestFetcher<T> implements Loader.Callback {
 
 
 
+  private class SingleFetchHelper implements Loader.Callback {
+
+    private final UriLoadable<T> singleUseLoadable;
+    private final Looper callbackLooper;
+    private final ManifestCallback<T> wrappedCallback;
+    private final Loader singleUseLoader;
+
+    private long loadStartTimestamp;
+
+    public SingleFetchHelper(UriLoadable<T> singleUseLoadable, Looper callbackLooper,
+        ManifestCallback<T> wrappedCallback) {
+      this.singleUseLoadable = singleUseLoadable;
+      this.callbackLooper = callbackLooper;
+      this.wrappedCallback = wrappedCallback;
+      singleUseLoader = new Loader("manifestLoader:single");
+    }
+
+    public void startLoading() {
+      loadStartTimestamp = SystemClock.elapsedRealtime();
+      singleUseLoader.startLoading(callbackLooper, singleUseLoadable, this);
+    }
+
+    @Override
+    public void onLoadCanceled(Loadable loadable) {
+      
+    }
+
+    @Override
+    public void onLoadCompleted(Loadable loadable) {
+
+    }
+
+    @Override
+    public void onLoadError(Loadable loadable, IOException exception) {
+
+    }
+  }
     @Override
     public void onLoadCompleted(Loadable loadable) {
 

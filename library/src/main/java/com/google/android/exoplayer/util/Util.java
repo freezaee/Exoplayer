@@ -24,6 +24,10 @@ import android.net.Uri;
 import android.os.Build;
 import android.text.TextUtils;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+
 /**
  * Miscellaneous utility functions.
  */
@@ -79,6 +83,21 @@ public final class Util {
   public static boolean areEqual(Object o1, Object o2) {
     return o1 == null ? o2 == null : o1.equals(o2);
   }
+  /**
+   * Instantiates a new single threaded executor whose thread has the specified name.
+   *
+   * @param threadName The name of the thread.
+   * @return The executor.
+   */
+  public static ExecutorService newSingleThreadExecutor(final String threadName) {
+    return Executors.newSingleThreadExecutor(new ThreadFactory() {
+      @Override
+      public Thread newThread(Runnable r) {
+        return new Thread(r, threadName);
+      }
+    });
+  }
+
 
   /**
    * Returns a user agent string based on the given application name and the library version.

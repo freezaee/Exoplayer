@@ -18,6 +18,8 @@ package com.google.android.exoplayer.upstream;
 import com.google.android.exoplayer.ParserException;
 import com.google.android.exoplayer.upstream.Loader.Loadable;
 
+import android.net.Uri;
+
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -46,18 +48,52 @@ public final class UriLoadable<T> implements Loadable {
 
   }
 
-    @Override
-    public void cancelLoad() {
-        
-    }
+  private final DataSpec dataSpec;
+  private final UriDataSource uriDataSource;
+  private final Parser<T> parser;
 
-    @Override
-    public boolean isLoadCanceled() {
-        return false;
-    }
+  private volatile T result;
+  private volatile boolean isCanceled;
 
-    @Override
-    public void load() throws IOException, InterruptedException {
+  /**
+   * @param url The url from which the object should be loaded.
+   * @param uriDataSource A {@link UriDataSource} to use when loading the data.
+   * @param parser Parses the object from the response.
+   */
+  public UriLoadable(String url, UriDataSource uriDataSource, Parser<T> parser) {
+    this.uriDataSource = uriDataSource;
+    this.parser = parser;
+    dataSpec = new DataSpec(Uri.parse(url), DataSpec.FLAG_ALLOW_GZIP);
+  }
 
+  /**
+   * Returns the loaded object, or null if an object has not been loaded.
+   */
+  public final T getResult() {
+    return result;
+  }
+
+  @Override
+  public final void cancelLoad() {
+    // We don't actually cancel anything, but we need to record the cancellation so that
+    // isLoadCanceled can return the correct value.
+    isCanceled = true;
+  }
+
+  @Override
+  public final boolean isLoadCanceled() {
+    return isCanceled;
+  }
+
+  @Override
+  public final void load() throws IOException, InterruptedException {
+    DataSourceInputStream inputStream = new DataSourceInputStream(uriDataSource, dataSpec);
+    try {
+      inputStream.open();
+      result = parser.parse(uriDataSource.getUri(), inputStream);
+    } finally {
+      inputStream.close();
     }
+  }
+
 }

@@ -56,10 +56,13 @@ public class DashRendererBuilder implements RendererBuilder {
     currentAsyncBuilder.init();
   }
 
-    @Override
-    public void cancel() {
-
+  @Override
+  public void cancel() {
+    if (currentAsyncBuilder != null) {
+      currentAsyncBuilder.cancel();
+      currentAsyncBuilder = null;
     }
+  }
 
   private static final class AsyncRendererBuilder
       implements ManifestFetcher.ManifestCallback<MediaPresentationDescription>, UtcTimingCallback {
@@ -71,6 +74,8 @@ public class DashRendererBuilder implements RendererBuilder {
     private final ManifestFetcher<MediaPresentationDescription> manifestFetcher;
     private final UriDataSource manifestDataSource;
 
+    private boolean canceled;
+    private MediaPresentationDescription manifest;
 
     public AsyncRendererBuilder(Context context, String userAgent, String url,
         MediaDrmCallback drmCallback, DemoPlayer player) {
@@ -86,9 +91,18 @@ public class DashRendererBuilder implements RendererBuilder {
     public void init() {
       manifestFetcher.singleLoad(player.getMainHandler().getLooper(), this);
     }
+
+    public void cancel() {
+      canceled = true;
+    }
+
     @Override
     public void onSingleManifest(MediaPresentationDescription manifest) {
+      if (canceled) {
+        return;
+      }
 
+      this.manifest = manifest;
     }
 
     @Override
