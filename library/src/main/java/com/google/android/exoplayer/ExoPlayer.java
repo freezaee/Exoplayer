@@ -129,6 +129,18 @@ public interface ExoPlayer {
       return new ExoPlayerImpl(rendererCount, minBufferMs, minRebufferMs);
     }
 
+    /**
+     * Obtains an {@link ExoPlayer} instance.
+     * <p>
+     * Must be invoked from a thread that has an associated {@link Looper}.
+     *
+     * @param rendererCount The number of {@link TrackRenderer}s that will be passed to
+     *     {@link #prepare(TrackRenderer[])}.
+     */
+    public static ExoPlayer newInstance(int rendererCount) {
+      return new ExoPlayerImpl(rendererCount, DEFAULT_MIN_BUFFER_MS, DEFAULT_MIN_REBUFFER_MS);
+    }
+
   }
 
   /**
@@ -223,8 +235,50 @@ public interface ExoPlayer {
    * Represents an unknown time or duration.
    */
   public static final long UNKNOWN_TIME = -1;
+
+  /**
+   * Gets the {@link Looper} associated with the playback thread.
+   *
+   * @return The {@link Looper} associated with the playback thread.
+   */
+  public Looper getPlaybackLooper();
+
+  /**
+   * Register a listener to receive events from the player. The listener's methods will be invoked
+   * on the thread that was used to construct the player.
+   *
+   * @param listener The listener to register.
+   */
   public void addListener(Listener listener);
+
+  /**
+   * Unregister a listener. The listener will no longer receive events from the player.
+   *
+   * @param listener The listener to unregister.
+   */
+  public void removeListener(Listener listener);
+
+  /**
+   * Returns the current state of the player.
+   *
+   * @return One of the {@code STATE} constants defined in this interface.
+   */
   public int getPlaybackState();
+
+  /**
+   * Prepares the player for playback.
+   *
+   * @param renderers The {@link TrackRenderer}s to use. The number of renderers must match the
+   *     value that was passed to the {@link ExoPlayer.Factory#newInstance} method.
+   */
+  public void prepare(TrackRenderer... renderers);
+
+  /**
+   * Returns the number of tracks exposed by the specified renderer.
+   *
+   * @param rendererIndex The index of the renderer.
+   * @return The number of tracks.
+   */
   public int getTrackCount(int rendererIndex);
 
   /**
@@ -269,6 +323,14 @@ public interface ExoPlayer {
    * @return Whether playback will proceed when ready.
    */
   public boolean getPlayWhenReady();
+
+  /**
+   * Whether the current value of {@link ExoPlayer#getPlayWhenReady()} has been reflected by the
+   * internal playback thread.
+   *
+   * @return True if the current value has been reflected. False otherwise.
+   */
+  public boolean isPlayWhenReadyCommitted();
 
   /**
    * Seeks to a position specified in milliseconds.

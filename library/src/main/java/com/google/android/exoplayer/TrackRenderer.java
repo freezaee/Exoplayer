@@ -28,4 +28,9 @@ import com.google.android.exoplayer.ExoPlayer.ExoPlayerComponent;
  *     border="0"/></p>
  */
 public abstract class TrackRenderer implements ExoPlayerComponent {
+
+  /**
+   * Represents an unknown time or duration. Equal to {@link C#UNKNOWN_TIME_US}.
+   */
+  public static final long UNKNOWN_TIME_US = C.UNKNOWN_TIME_US; // -1
 }
