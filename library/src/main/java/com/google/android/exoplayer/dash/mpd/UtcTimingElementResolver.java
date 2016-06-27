@@ -15,12 +15,30 @@
  */
 package com.google.android.exoplayer.dash.mpd;
 
+import com.google.android.exoplayer.upstream.Loader;
+import com.google.android.exoplayer.upstream.UriDataSource;
+
 import java.io.IOException;
 
 /**
- * Created by Elvis.He on 2016/6/25.
+ * Resolves a {@link UtcTimingElement}.
  */
-public class UtcTimingElementResolver {
+public final class UtcTimingElementResolver implements Loader.Callback {
+
+  @Override
+  public void onLoadCanceled(Loader.Loadable loadable) {
+
+  }
+
+  @Override
+  public void onLoadCompleted(Loader.Loadable loadable) {
+
+  }
+
+  @Override
+  public void onLoadError(Loader.Loadable loadable, IOException exception) {
+
+  }
 
   /**
    * Callback for timing element resolution.
@@ -30,10 +48,10 @@ public class UtcTimingElementResolver {
     /**
      * Invoked when the element has been resolved.
      *
-     * @param utcTiming The element that was resolved.
+     * @param utcTiming             The element that was resolved.
      * @param elapsedRealtimeOffset The offset between the resolved UTC time and
-     *     {@link SystemClock#elapsedRealtime()} in milliseconds, specified as the UTC time minus
-     *     the local elapsed time.
+     *                              {@link SystemClock#elapsedRealtime()} in milliseconds, specified as the UTC time minus
+     *                              the local elapsed time.
      */
     void onTimestampResolved(UtcTimingElement utcTiming, long elapsedRealtimeOffset);
 
@@ -41,8 +59,25 @@ public class UtcTimingElementResolver {
      * Invoked when the element was not successfully resolved.
      *
      * @param utcTiming The element that was not resolved.
-     * @param e The cause of the failure.
+     * @param e         The cause of the failure.
      */
     void onTimestampError(UtcTimingElement utcTiming, IOException e);
   }
+
+  /**
+   * Resolves a {@link UtcTimingElement}.
+   *
+   * @param uriDataSource A source to use should loading from a URI be necessary.
+   * @param timingElement The element to resolve.
+   * @param timingElementElapsedRealtime The {@link SystemClock#elapsedRealtime()} timestamp at
+   *     which the element was obtained. Used if the element contains a timestamp directly.
+   * @param callback The callback to invoke on resolution or failure.
+   */
+
+  public static void resolveTimingElement(UriDataSource uriDataSource,
+                                          UtcTimingElement timingElement, long timingElementElapsedRealtime,
+                                          UtcTimingCallback callback) {
+  }
+
+
 }

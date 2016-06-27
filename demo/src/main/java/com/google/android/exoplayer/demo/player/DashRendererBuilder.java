@@ -18,6 +18,7 @@ package com.google.android.exoplayer.demo.player;
 import com.google.android.exoplayer.dash.mpd.MediaPresentationDescription;
 import com.google.android.exoplayer.dash.mpd.MediaPresentationDescriptionParser;
 import com.google.android.exoplayer.dash.mpd.UtcTimingElement;
+import com.google.android.exoplayer.dash.mpd.UtcTimingElementResolver;
 import com.google.android.exoplayer.dash.mpd.UtcTimingElementResolver.UtcTimingCallback;
 import com.google.android.exoplayer.demo.player.DemoPlayer.RendererBuilder;
 import com.google.android.exoplayer.drm.MediaDrmCallback;
@@ -25,6 +26,7 @@ import com.google.android.exoplayer.upstream.DefaultUriDataSource;
 import com.google.android.exoplayer.upstream.UriDataSource;
 import com.google.android.exoplayer.util.ManifestFetcher;
 import android.content.Context;
+import android.util.Log;
 
 import java.io.IOException;
 
@@ -76,6 +78,7 @@ public class DashRendererBuilder implements RendererBuilder {
 
     private boolean canceled;
     private MediaPresentationDescription manifest;
+    private long elapsedRealtimeOffset;
 
     public AsyncRendererBuilder(Context context, String userAgent, String url,
         MediaDrmCallback drmCallback, DemoPlayer player) {
@@ -103,21 +106,45 @@ public class DashRendererBuilder implements RendererBuilder {
       }
 
       this.manifest = manifest;
+      if (manifest.dynamic && manifest.utcTiming != null) {
+        UtcTimingElementResolver.resolveTimingElement(manifestDataSource, manifest.utcTiming,
+            manifestFetcher.getManifestLoadCompleteTimestamp(), this);
+      } else {
+        buildRenderers();
+      }
     }
 
     @Override
     public void onSingleManifestError(IOException e) {
+      if (canceled) {
+        return;
+      }
 
+      player.onRenderersError(e);
     }
 
     @Override
     public void onTimestampResolved(UtcTimingElement utcTiming, long elapsedRealtimeOffset) {
+      if (canceled) {
+        return;
+      }
 
+      this.elapsedRealtimeOffset = elapsedRealtimeOffset;
+      buildRenderers();
     }
 
     @Override
     public void onTimestampError(UtcTimingElement utcTiming, IOException e) {
+      if (canceled) {
+        return;
+      }
 
+      Log.e(TAG, "Failed to resolve UtcTiming element [" + utcTiming + "]", e);
+      // Be optimistic and continue in the hope that the device clock is correct.
+      buildRenderers();
+    }
+
+    private void buildRenderers() {
     }
   }
 

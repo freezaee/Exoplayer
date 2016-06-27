@@ -23,8 +23,10 @@ import com.google.android.exoplayer.upstream.UriLoadable;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.text.TextUtils;
 
 import java.io.IOException;
+import java.util.concurrent.CancellationException;
 
 /**
  * Performs both single and repeated loads of media manifests.
@@ -44,6 +46,14 @@ import java.io.IOException;
  * @param <T> The type of manifest.
  */
 public class ManifestFetcher<T> implements Loader.Callback {
+
+  /**
+   * Thrown when an error occurs trying to fetch a manifest.
+   */
+  public static final class ManifestIOException extends IOException{
+    public ManifestIOException(Throwable cause) { super(cause); }
+
+  }
 
   /**
    * Interface definition for a callback to be notified of {@link ManifestFetcher} events.
@@ -81,6 +91,19 @@ public class ManifestFetcher<T> implements Loader.Callback {
 
   }
 
+  /**
+   * Interface for manifests that are able to specify that subsequent loads should use a different
+   * URI.
+   */
+  public interface RedirectingManifest {
+
+    /**
+     * Returns the URI from which subsequent manifests should be requested, or null to continue
+     * using the current URI.
+     */
+    public String getNextManifestUri();
+
+  }
 
   private final UriLoadable.Parser<T> parser;
   private final UriDataSource uriDataSource;
@@ -88,6 +111,19 @@ public class ManifestFetcher<T> implements Loader.Callback {
   private final EventListener eventListener;
 
   /* package */ volatile String manifestUri;
+
+  private int enabledCount;
+  private Loader loader;
+  private UriLoadable<T> currentLoadable;
+  private long currentLoadStartTimestamp;
+
+  private int loadExceptionCount;
+  private long loadExceptionTimestamp;
+  private ManifestIOException loadException;
+
+  private volatile T manifest;
+  private volatile long manifestLoadStartTimestamp;
+  private volatile long manifestLoadCompleteTimestamp;
 
   /**
    * @param manifestUri The manifest location.
@@ -115,6 +151,16 @@ public class ManifestFetcher<T> implements Loader.Callback {
     this.eventHandler = eventHandler;
     this.eventListener = eventListener;
   }
+
+  /**
+   * Updates the manifest location.
+   *
+   * @param manifestUri The manifest location.
+   */
+  public void updateManifestUri(String manifestUri) {
+    this.manifestUri = manifestUri;
+  }
+
   /**
    * Performs a single manifest load.
    *
@@ -127,12 +173,136 @@ public class ManifestFetcher<T> implements Loader.Callback {
         new UriLoadable<>(manifestUri, uriDataSource, parser), callbackLooper, callback);
     fetchHelper.startLoading();
   }
+
+  /**
+   * Gets a {@link Pair} containing the most recently loaded manifest together with the timestamp
+   * at which the load completed.
+   *
+   * @return The most recently loaded manifest and the timestamp at which the load completed, or
+   *     null if no manifest has loaded.
+   */
+  public T getManifest() {
+    return manifest;
+  }
+
+  /**
+   * Gets the value of {@link SystemClock#elapsedRealtime()} when the last completed load started.
+   *
+   * @return The value of {@link SystemClock#elapsedRealtime()} when the last completed load
+   *     started.
+   */
+  public long getManifestLoadStartTimestamp() {
+    return manifestLoadStartTimestamp;
+  }
+
+  /**
+   * Gets the value of {@link SystemClock#elapsedRealtime()} when the last load completed.
+   *
+   * @return The value of {@link SystemClock#elapsedRealtime()} when the last load completed.
+   */
+  public long getManifestLoadCompleteTimestamp() {
+    return manifestLoadCompleteTimestamp;
+  }
+
+  /**
+   * Throws the error that affected the most recent attempt to load the manifest. Does nothing if
+   * the most recent attempt was successful.
+   *
+   * @throws ManifestIOException The error that affected the most recent attempt to load the
+   *     manifest.
+   */
+  public void maybeThrowError() throws ManifestIOException {
+    // Don't throw an exception until at least 1 retry attempt has been made.
+    if (loadException == null || loadExceptionCount <= 1) {
+      return;
+    }
+    throw loadException;
+  }
+  @Override
+  public void onLoadCompleted(Loadable loadable) {
+    if (currentLoadable != loadable) {
+      // Stale event.
+      return;
+    }
+
+    manifest = currentLoadable.getResult();
+    manifestLoadStartTimestamp = currentLoadStartTimestamp;
+    manifestLoadCompleteTimestamp = SystemClock.elapsedRealtime();
+    loadExceptionCount = 0;
+    loadException = null;
+
+    if (manifest instanceof RedirectingManifest) {
+      RedirectingManifest redirectingManifest = (RedirectingManifest) manifest;
+      String nextLocation = redirectingManifest.getNextManifestUri();
+      if (!TextUtils.isEmpty(nextLocation)) {
+        manifestUri = nextLocation;
+      }
+    }
+
+    notifyManifestRefreshed();
+  }
+
   @Override
   public void onLoadCanceled(Loadable loadable) {
     // Do nothing.
   }
 
+  @Override
+  public void onLoadError(Loadable loadable, IOException exception) {
+    if (currentLoadable != loadable) {
+      // Stale event.
+      return;
+    }
 
+    loadExceptionCount++;
+    loadExceptionTimestamp = SystemClock.elapsedRealtime();
+    loadException = new ManifestIOException(exception);
+
+    notifyManifestError(loadException);
+  }
+
+  /* package */ void onSingleFetchCompleted(T result, long loadStartTimestamp) {
+    manifest = result;
+    manifestLoadStartTimestamp = loadStartTimestamp;
+    manifestLoadCompleteTimestamp = SystemClock.elapsedRealtime();
+  }
+
+  private long getRetryDelayMillis(long errorCount) {
+    return Math.min((errorCount - 1) * 1000, 5000);
+  }
+
+  private void notifyManifestRefreshStarted() {
+    if (eventHandler != null && eventListener != null) {
+      eventHandler.post(new Runnable()  {
+        @Override
+        public void run() {
+          eventListener.onManifestRefreshStarted();
+        }
+      });
+    }
+  }
+
+  private void notifyManifestRefreshed() {
+    if (eventHandler != null && eventListener != null) {
+      eventHandler.post(new Runnable()  {
+        @Override
+        public void run() {
+          eventListener.onManifestRefreshed();
+        }
+      });
+    }
+  }
+
+  private void notifyManifestError(final IOException e) {
+    if (eventHandler != null && eventListener != null) {
+      eventHandler.post(new Runnable()  {
+        @Override
+        public void run() {
+          eventListener.onManifestError(e);
+        }
+      });
+    }
+  }
 
   private class SingleFetchHelper implements Loader.Callback {
 
@@ -157,27 +327,40 @@ public class ManifestFetcher<T> implements Loader.Callback {
     }
 
     @Override
+    public void onLoadCompleted(Loadable loadable) {
+      try {
+        T result = singleUseLoadable.getResult();
+        onSingleFetchCompleted(result, loadStartTimestamp);
+        wrappedCallback.onSingleManifest(result);
+      } finally {
+        releaseLoader();
+      }
+    }
+
+    @Override
     public void onLoadCanceled(Loadable loadable) {
-      
-    }
-
-    @Override
-    public void onLoadCompleted(Loadable loadable) {
-
+      // This shouldn't ever happen, but handle it anyway.
+      try {
+        IOException exception = new ManifestIOException(new CancellationException());
+        wrappedCallback.onSingleManifestError(exception);
+      } finally {
+        releaseLoader();
+      }
     }
 
     @Override
     public void onLoadError(Loadable loadable, IOException exception) {
-
+      try {
+        wrappedCallback.onSingleManifestError(exception);
+      } finally {
+        releaseLoader();
+      }
     }
+
+    private void releaseLoader() {
+      singleUseLoader.release();
+    }
+
   }
-    @Override
-    public void onLoadCompleted(Loadable loadable) {
 
-    }
-
-    @Override
-    public void onLoadError(Loadable loadable, IOException exception) {
-
-    }
 }

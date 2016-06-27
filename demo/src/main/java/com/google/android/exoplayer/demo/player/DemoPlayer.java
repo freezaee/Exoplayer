@@ -273,6 +273,23 @@ public class DemoPlayer implements ExoPlayer.Listener,
     maybeReportPlayerState();
     rendererBuilder.buildRenderers(this);
   }
+
+  /**
+   * Invoked if a {@link RendererBuilder} encounters an error.
+   *
+   * @param e Describes the error.
+   */
+  /* package */ void onRenderersError(Exception e) {
+    if (internalErrorListener != null) {
+      internalErrorListener.onRendererInitializationError(e);
+    }
+    for (Listener listener : listeners) {
+      listener.onError(e);
+    }
+    rendererBuildingState = RENDERER_BUILDING_STATE_IDLE;
+    maybeReportPlayerState();
+  }
+
   public void setPlayWhenReady(boolean playWhenReady) {
     player.setPlayWhenReady(playWhenReady);
   }

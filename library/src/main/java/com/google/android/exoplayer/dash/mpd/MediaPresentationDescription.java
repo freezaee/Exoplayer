@@ -15,8 +15,65 @@
  */
 package com.google.android.exoplayer.dash.mpd;
 
+import com.google.android.exoplayer.util.ManifestFetcher.RedirectingManifest;
+
+import java.util.Collections;
+import java.util.List;
+
 /**
  * Represents a DASH media presentation description (mpd).
  */
-public class MediaPresentationDescription {
+public class MediaPresentationDescription implements RedirectingManifest {
+
+  public final long availabilityStartTime;
+
+  public final long duration;
+
+  public final long minBufferTime;
+
+  public final boolean dynamic;
+
+  public final long minUpdatePeriod;
+
+  public final long timeShiftBufferDepth;
+
+  public final UtcTimingElement utcTiming;
+
+  public final String location;
+
+  private final List<Period> periods;
+
+  public MediaPresentationDescription(long availabilityStartTime, long duration, long minBufferTime,
+      boolean dynamic, long minUpdatePeriod, long timeShiftBufferDepth, UtcTimingElement utcTiming,
+      String location, List<Period> periods) {
+    this.availabilityStartTime = availabilityStartTime;
+    this.duration = duration;
+    this.minBufferTime = minBufferTime;
+    this.dynamic = dynamic;
+    this.minUpdatePeriod = minUpdatePeriod;
+    this.timeShiftBufferDepth = timeShiftBufferDepth;
+    this.utcTiming = utcTiming;
+    this.location = location;
+    this.periods = periods == null ? Collections.<Period>emptyList() : periods;
+  }
+
+  @Override
+  public final String getNextManifestUri() {
+    return location;
+  }
+
+  public final int getPeriodCount() {
+    return periods.size();
+  }
+
+  public final Period getPeriod(int index) {
+    return periods.get(index);
+  }
+
+  public final long getPeriodDuration(int index) {
+    return index == periods.size() - 1
+        ? (duration == -1 ? -1 : duration - periods.get(index).startMs)
+        : periods.get(index + 1).startMs - periods.get(index).startMs;
+  }
+
 }
