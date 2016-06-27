@@ -17,14 +17,18 @@ package com.google.android.exoplayer.demo.player;
 
 import com.google.android.exoplayer.ExoPlaybackException;
 import com.google.android.exoplayer.ExoPlayer;
+import com.google.android.exoplayer.MediaCodecTrackRenderer;
 import com.google.android.exoplayer.MediaCodecTrackRenderer.DecoderInitializationException;
 import com.google.android.exoplayer.MediaCodecVideoTrackRenderer;
 import com.google.android.exoplayer.MediaFormat;
 import com.google.android.exoplayer.TimeRange;
 import com.google.android.exoplayer.TrackRenderer;
 import com.google.android.exoplayer.audio.AudioTrack;
+import com.google.android.exoplayer.drm.StreamingDrmSessionManager;
 import com.google.android.exoplayer.metadata.id3.Id3Frame;
 import com.google.android.exoplayer.text.Cue;
+import com.google.android.exoplayer.upstream.BandwidthMeter;
+import com.google.android.exoplayer.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer.util.DebugTextViewHelper;
 import com.google.android.exoplayer.util.PlayerControl;
 
@@ -46,7 +50,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 
 public class DemoPlayer implements ExoPlayer.Listener,
+DefaultBandwidthMeter.EventListener,
+StreamingDrmSessionManager.EventListener,
 	DebugTextViewHelper.Provider {
+
 
 
   /**
@@ -275,6 +282,17 @@ public class DemoPlayer implements ExoPlayer.Listener,
   }
 
   /**
+   * Invoked with the results from a {@link RendererBuilder}.
+   *
+   * @param renderers Renderers indexed by {@link DemoPlayer} TYPE_* constants. An individual
+   *     element may be null if there do not exist tracks of the corresponding type.
+   * @param bandwidthMeter Provides an estimate of the currently available bandwidth. May be null.
+   */
+  /* package */ void onRenderers(TrackRenderer[] renderers, BandwidthMeter bandwidthMeter) {
+
+  }
+
+  /**
    * Invoked if a {@link RendererBuilder} encounters an error.
    *
    * @param e Describes the error.
@@ -352,6 +370,27 @@ public class DemoPlayer implements ExoPlayer.Listener,
     rendererBuildingState = RENDERER_BUILDING_STATE_IDLE;
     for (Listener listener : listeners) {
       listener.onError(exception);
+    }
+  }
+
+
+  @Override
+  public void onBandwidthSample(int elapsedMs, long bytes, long bitrateEstimate) {
+    if (infoListener != null) {
+      infoListener.onBandwidthSample(elapsedMs, bytes, bitrateEstimate);
+    }
+    
+  }
+
+  @Override
+  public void onDrmKeysLoaded() {
+    // Do nothing.
+  }
+
+  @Override
+  public void onDrmSessionManagerError(Exception e) {
+    if (internalErrorListener != null) {
+      internalErrorListener.onDrmSessionManagerError(e);
     }
   }
 

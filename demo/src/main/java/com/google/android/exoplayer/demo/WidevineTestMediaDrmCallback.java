@@ -16,13 +16,27 @@
 package com.google.android.exoplayer.demo;
 
 import android.annotation.TargetApi;
+import android.media.MediaDrm;
 
 import com.google.android.exoplayer.drm.MediaDrmCallback;
+
+import java.util.UUID;
+
 /**
  * A {@link MediaDrmCallback} for Widevine test content.
  */
 @TargetApi(18)
 public class WidevineTestMediaDrmCallback implements MediaDrmCallback {
   public WidevineTestMediaDrmCallback(String contentId, String provider) {
+  }
+
+  @Override
+  public byte[] executeProvisionRequest(UUID uuid, MediaDrm.ProvisionRequest request) throws Exception {
+    return new byte[0];
+  }
+
+  @Override
+  public byte[] executeKeyRequest(UUID uuid, MediaDrm.KeyRequest request) throws Exception {
+    return new byte[0];
   }
 }

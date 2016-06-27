@@ -15,17 +15,42 @@
  */
 package com.google.android.exoplayer.demo.player;
 
+import com.google.android.exoplayer.DefaultLoadControl;
+import com.google.android.exoplayer.LoadControl;
+import com.google.android.exoplayer.MediaCodecAudioTrackRenderer;
+import com.google.android.exoplayer.MediaCodecSelector;
+import com.google.android.exoplayer.MediaCodecVideoTrackRenderer;
+import com.google.android.exoplayer.TrackRenderer;
+import com.google.android.exoplayer.audio.AudioCapabilities;
+import com.google.android.exoplayer.chunk.ChunkSampleSource;
+import com.google.android.exoplayer.chunk.ChunkSource;
+import com.google.android.exoplayer.chunk.FormatEvaluator.AdaptiveEvaluator;
+import com.google.android.exoplayer.dash.DashChunkSource;
+import com.google.android.exoplayer.dash.DefaultDashTrackSelector;
+import com.google.android.exoplayer.dash.mpd.AdaptationSet;
 import com.google.android.exoplayer.dash.mpd.MediaPresentationDescription;
 import com.google.android.exoplayer.dash.mpd.MediaPresentationDescriptionParser;
+import com.google.android.exoplayer.dash.mpd.Period;
 import com.google.android.exoplayer.dash.mpd.UtcTimingElement;
 import com.google.android.exoplayer.dash.mpd.UtcTimingElementResolver;
 import com.google.android.exoplayer.dash.mpd.UtcTimingElementResolver.UtcTimingCallback;
 import com.google.android.exoplayer.demo.player.DemoPlayer.RendererBuilder;
 import com.google.android.exoplayer.drm.MediaDrmCallback;
+import com.google.android.exoplayer.drm.StreamingDrmSessionManager;
+import com.google.android.exoplayer.drm.UnsupportedDrmException;
+import com.google.android.exoplayer.text.TextTrackRenderer;
+import com.google.android.exoplayer.upstream.DataSource;
+import com.google.android.exoplayer.upstream.DefaultAllocator;
+import com.google.android.exoplayer.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer.upstream.DefaultUriDataSource;
 import com.google.android.exoplayer.upstream.UriDataSource;
 import com.google.android.exoplayer.util.ManifestFetcher;
+import com.google.android.exoplayer.util.Util;
+
 import android.content.Context;
+import android.media.AudioManager;
+import android.media.MediaCodec;
+import android.os.Handler;
 import android.util.Log;
 
 import java.io.IOException;
@@ -36,6 +61,16 @@ import java.io.IOException;
 public class DashRendererBuilder implements RendererBuilder {
 
   private static final String TAG = "DashRendererBuilder";
+
+  private static final int BUFFER_SEGMENT_SIZE = 64 * 1024;
+  private static final int VIDEO_BUFFER_SEGMENTS = 200;
+  private static final int AUDIO_BUFFER_SEGMENTS = 54;
+  private static final int TEXT_BUFFER_SEGMENTS = 2;
+  private static final int LIVE_EDGE_LATENCY_MS = 30000;
+
+  private static final int SECURITY_LEVEL_UNKNOWN = -1;
+  private static final int SECURITY_LEVEL_1 = 1;
+  private static final int SECURITY_LEVEL_3 = 3;
 
   private final Context context;
   private final String userAgent;
@@ -145,7 +180,45 @@ public class DashRendererBuilder implements RendererBuilder {
     }
 
     private void buildRenderers() {
+      Period period = manifest.getPeriod(0);
+      Handler mainHandler = player.getMainHandler();
+      LoadControl loadControl = new DefaultLoadControl(new DefaultAllocator(BUFFER_SEGMENT_SIZE));
+      DefaultBandwidthMeter bandwidthMeter = new DefaultBandwidthMeter(mainHandler, player);
+
+      boolean hasContentProtection = false;
+      for (int i = 0; i < period.adaptationSets.size(); i++) {
+        AdaptationSet adaptationSet = period.adaptationSets.get(i);
+        if (adaptationSet.type != AdaptationSet.TYPE_UNKNOWN) {
+          hasContentProtection |= adaptationSet.hasContentProtection();
+        }
+      }
+
+      // Check drm support if necessary.
+      boolean filterHdContent = false;
+      StreamingDrmSessionManager drmSessionManager = null;
+      if (hasContentProtection) {
+        if (Util.SDK_INT < 18) {
+          player.onRenderersError(
+              new UnsupportedDrmException(UnsupportedDrmException.REASON_UNSUPPORTED_SCHEME));
+          return;
+        }
+        try {
+          drmSessionManager = StreamingDrmSessionManager.newWidevineInstance(
+              player.getPlaybackLooper(), drmCallback, null, player.getMainHandler(), player);
+          filterHdContent = getWidevineSecurityLevel(drmSessionManager) != SECURITY_LEVEL_1;
+        } catch (UnsupportedDrmException e) {
+          player.onRenderersError(e);
+          return;
+        }
+      }
     }
+
+    private static int getWidevineSecurityLevel(StreamingDrmSessionManager sessionManager) {
+      String securityLevelProperty = sessionManager.getPropertyString("securityLevel");
+      return securityLevelProperty.equals("L1") ? SECURITY_LEVEL_1 : securityLevelProperty
+          .equals("L3") ? SECURITY_LEVEL_3 : SECURITY_LEVEL_UNKNOWN;
+    }
+
   }
 
 }

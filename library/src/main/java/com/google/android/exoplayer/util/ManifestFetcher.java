@@ -24,6 +24,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.Pair;
 
 import java.io.IOException;
 import java.util.concurrent.CancellationException;
@@ -218,6 +219,49 @@ public class ManifestFetcher<T> implements Loader.Callback {
     }
     throw loadException;
   }
+
+  /**
+   * Enables refresh functionality.
+   */
+  public void enable() {
+    if (enabledCount++ == 0) {
+      loadExceptionCount = 0;
+      loadException = null;
+    }
+  }
+
+  /**
+   * Disables refresh functionality.
+   */
+  public void disable() {
+    if (--enabledCount == 0) {
+      if (loader != null) {
+        loader.release();
+        loader = null;
+      }
+    }
+  }
+
+  /**
+   * Should be invoked repeatedly by callers who require an updated manifest.
+   */
+  public void requestRefresh() {
+    if (loadException != null && SystemClock.elapsedRealtime()
+        < (loadExceptionTimestamp + getRetryDelayMillis(loadExceptionCount))) {
+      // The previous load failed, and it's too soon to try again.
+      return;
+    }
+    if (loader == null) {
+      loader = new Loader("manifestLoader");
+    }
+    if (!loader.isLoading()) {
+      currentLoadable = new UriLoadable<>(manifestUri, uriDataSource, parser);
+      currentLoadStartTimestamp = SystemClock.elapsedRealtime();
+      loader.startLoading(currentLoadable, this);
+      notifyManifestRefreshStarted();
+    }
+  }
+
   @Override
   public void onLoadCompleted(Loadable loadable) {
     if (currentLoadable != loadable) {
